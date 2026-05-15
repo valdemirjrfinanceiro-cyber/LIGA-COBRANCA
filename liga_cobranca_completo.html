@@ -1137,26 +1137,42 @@ async function uploadToDrive(c){
 
 async function testarConexao(){
   const status = document.getElementById('cfgStatus');
-  if(!gConfig.clientId||!gConfig.apiKey||!gConfig.folderId){
-    status.innerHTML = '❌ Preencha todos os campos antes de testar.';
+  if(!gConfig.clientId||!gConfig.folderId){
+    status.innerHTML = '❌ Preencha Client ID e ID da Pasta antes de testar.';
     return;
   }
-  status.textContent = '🔄 Testando...';
+  status.textContent = '🔄 Autenticando com o Google...';
   try {
     await gisAuth();
+    status.textContent = '🔄 Verificando acesso à pasta...';
+
+    // Tenta listar arquivos dentro da pasta (funciona para pastas compartilhadas)
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${gConfig.folderId}?fields=name&key=${gConfig.apiKey}`,
+      `https://www.googleapis.com/drive/v3/files?q=%27${gConfig.folderId}%27+in+parents&fields=files(id,name)&pageSize=1`,
       { headers:{ Authorization:'Bearer '+accessToken }}
     );
+
     if(res.ok){
-      const d = await res.json();
-      status.innerHTML = `✅ Conexão OK! Pasta encontrada: <strong>${d.name}</strong>`;
+      status.innerHTML = `✅ Conexão OK! Drive conectado e pasta acessível. Pode usar o sistema!`;
+      showToast('Google Drive conectado! ✅','success');
+      return;
+    }
+
+    // Fallback: tenta acessar metadados da pasta
+    const res2 = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${gConfig.folderId}?fields=id,name`,
+      { headers:{ Authorization:'Bearer '+accessToken }}
+    );
+    if(res2.ok){
+      const d = await res2.json();
+      status.innerHTML = `✅ Conexão OK! Pasta: <strong>${d.name}</strong>`;
       showToast('Google Drive conectado! ✅','success');
     } else {
-      status.innerHTML = `❌ Pasta não encontrada. Verifique o ID.`;
+      status.innerHTML = `⚠️ Autenticação OK mas pasta não acessível.<br>Certifique-se que a pasta está compartilhada com <strong>valdemirjrfinanceiro@gmail.com</strong> como Editor.`;
     }
   } catch(err){
-    status.innerHTML = '❌ Erro de autenticação. Verifique o Client ID.';
+    console.error(err);
+    status.innerHTML = '❌ Erro de autenticação. Verifique o Client ID e tente novamente.';
   }
 }
 
